@@ -1,0 +1,154 @@
+---
+title: "ST 563 Final Project"
+author: ' '
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+## Introduction
+
+We may guess the background of a newly met friend by their actions and talking to find a comfortable topic that won’t offend either of you. Similar things can apply to songs as well: the release year of most songs may have some time-specific “signatures” that are jointly determined by rhythm, dynamics, etc.
+
+## Explaratory Data Analysis
+
+Reading the data
+```{r}
+train = read.delim(file = "data/YearPredictTrain.txt", header = TRUE, sep = ",", dec = ".")
+test = read.delim(file = "data/YearPredictTest.txt", header = TRUE, sep = ",", dec = ".")
+```
+
+```{r}
+head(train)
+```
+```{r}
+summary (train)
+```
+
+
+```{r}
+#train$Class = factor(train$Class)
+#levels(train$Class)
+```
+
+```{r}
+
+```
+
+
+```{r fig.height = 4, fig.width = 4}
+library(corrplot)
+library(dplyr)
+corrplot(cor(select (train, -c (Year, Class))), method = "circle", tl.pos='n')
+```
+
+
+```{r}
+pc = prcomp(select (train, -c (Year, Class)),
+            center = TRUE,
+            scale. = TRUE)
+summary(pc)
+```
+
+
+```{r}
+sum(is.na(train))
+sum(is.na(test))
+```
+
+## Data Pre-processing
+
+```{r}
+library(keras)
+
+
+x = model.matrix (Year ~.-1, data = select(train, -c(Class))) %>%
+  scale()
+x_test = model.matrix (Year ~.-1, data = select(test, -c(Class))) %>%
+  scale()
+
+y  = as.matrix (select(train, c(Year)))
+y_test = as.matrix (select(test, c(Year)))
+```
+
+
+## Model Building - Regression
+
+```{r}
+set.seed(5)
+
+nn = keras_model_sequential() %>%
+  layer_dense (unit = 64, activation = "relu", input_shape = ncol(x)) %>%
+  layer_dropout(rate = 0.2) %>% 
+  layer_dense (unit = 128, activation = "relu") %>%
+  layer_dense (units = 1)
+nn
+```
+
+```{r}
+library(tensorflow)
+
+nn %>% compile (loss = "mean_squared_error", 
+                optimizer = optimizer_rmsprop(),
+                metrics = list ("mean_absolute_error"))
+
+#early_stopping = EarlyStopping(monitor = "val_loss", min_delta = 0, patience = 0,
+#                               verbose = 0, mode = "auto")
+
+history = nn %>% fit (x, y, epochs = 200, 
+                      batch_size = 32,
+                      validation_data = list (x_test, y_test),
+                      verbose = 0.5)
+plot (history)
+```
+
+
+## Model Building - classification
+
+```{r}
+train$Class[train$Class == "prior to 1980"] = 0
+train$Class[train$Class == "between 1980 - 2000"] = 1
+train$Class[train$Class == "after 2000"] = 2
+y_train_label = as.integer(train$Class)
+
+test$Class[test$Class == "prior to 1980"] = 0
+test$Class[test$Class == "between 1980 - 2000"] = 1
+test$Class[test$Class == "after 2000"] = 2
+y_test_label = as.integer(test$Class)
+
+
+train_labels = y_train_label %>%
+  to_categorical(3)
+
+test_labels = y_test_label %>%
+  to_categorical(3)
+
+
+nn_classification = keras_model_sequential() %>%
+  layer_dense (unit = 64, activation = "relu", input_shape = ncol(x)) %>%
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense (unit = 128, activation = "relu") %>%
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense (unit = 64, activation = "relu") %>%
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense (unit = 32, activation = "relu") %>%
+  layer_dense (units = 3, activation = "softmax")
+nn_classification
+
+nn_classification %>% compile (optimizer = optimizer_rmsprop(),
+                               loss = "categorical_crossentropy",
+                               metrics = c("accuracy"))
+
+history = nn_classification %>% fit (x, train_labels, epochs = 150, 
+                      batch_size = 1000,
+                      validation_data = list (x_test, test_labels))
+plot (history)
+
+```
+
+
+
+
+## Final Result
