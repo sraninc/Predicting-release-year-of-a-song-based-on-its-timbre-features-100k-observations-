@@ -14,100 +14,123 @@ We may guess the background of a newly met friend by their actions and talking t
 
 ## Explaratory Data Analysis
 
+```{r}
+library(keras)
+library(tensorflow)
+library(rsample)
+library (dplyr)
+library(corrplot)
+library(dplyr)
+library (tfruns)
+library(xgboost)
+library (glmnet)
+```
+
 Reading the data
 ```{r}
 train = read.delim(file = "data/YearPredictTrain.txt", header = TRUE, sep = ",", dec = ".")
 test = read.delim(file = "data/YearPredictTest.txt", header = TRUE, sep = ",", dec = ".")
 ```
 
-```{r}
-head(train)
-```
-```{r}
-summary (train)
-```
-
-
-```{r}
+```{r fig.height = 4, fig.width = 4}
+#head(train)
+#summary (train)
 #train$Class = factor(train$Class)
 #levels(train$Class)
-```
-
-```{r}
-
-```
-
-
-```{r fig.height = 4, fig.width = 4}
-library(corrplot)
-library(dplyr)
-corrplot(cor(select (train, -c (Year, Class))), method = "circle", tl.pos='n')
+#corrplot(cor(select (train, -c (Year, Class))), method = "circle", tl.pos='n')
+#pc = prcomp(select (train, -c (Year, Class)),
+#            center = TRUE,
+#            scale. = TRUE)
+#summary(pc)
+#sum(is.na(x ))
+#sum(is.na(y_test))
 ```
 
 
-```{r}
-pc = prcomp(select (train, -c (Year, Class)),
-            center = TRUE,
-            scale. = TRUE)
-summary(pc)
-```
-
-
-```{r}
-sum(is.na(train))
-sum(is.na(test))
-```
 
 ## Data Pre-processing
 
-```{r}
-library(keras)
+Scaling train, test and validation datasets.
 
+```{r}
+set.seed(4)
 
 x = model.matrix (Year ~.-1, data = select(train, -c(Class))) %>%
   scale()
+y  = as.matrix (select(train, c(Year)))
+
 x_test = model.matrix (Year ~.-1, data = select(test, -c(Class))) %>%
   scale()
-
-y  = as.matrix (select(train, c(Year)))
 y_test = as.matrix (select(test, c(Year)))
+
 ```
 
 
-## Model Building - Regression
+## Model Building - NN Regression
+
 
 ```{r}
-set.seed(5)
+set.seed (10)
 
+train_flags <-list (
+  dropout1 = c(0.2, 0.3, 0.4),
+  nodes1 =   c(32, 64, 128),
+  nodes2 =   c(32, 64, 128),
+  nodes3 =   c(32, 64, 128),
+  l2 = c(0.001, 0.01, 0.05),
+  optimizer =  c("rmsprop", "adam", "sgd") 
+)
+
+runs_reg = tuning_run("nn_regression.R",  runs_dir = "runs_reg",
+                  flags = train_flags,
+                  sample = 0.01)
+```
+
+
+```{r}
+
+best_run = ls_runs(order = metric_mean_squared_error, decreasing= F, runs_dir = 'runs_reg')[1,]
 nn = keras_model_sequential() %>%
-  layer_dense (unit = 64, activation = "relu", input_shape = ncol(x)) %>%
-  layer_dropout(rate = 0.2) %>% 
-  layer_dense (unit = 128, activation = "relu") %>%
+  layer_dense (unit = best_run$flag_nodes1, activation = "relu", 
+               input_shape = ncol(x), 
+               kernel_regularizer = regularizer_l2(l = best_run$l2)) %>%
+   
+  layer_dense (unit = best_run$flag_nodes2, activation = "relu") %>%
+  layer_dropout(rate = best_run$flag_dropout1) %>%
+  layer_dense (unit = best_run$flag_nodes3, activation = "relu") %>%
   layer_dense (units = 1)
-nn
-```
 
-```{r}
-library(tensorflow)
 
-nn %>% compile (loss = "mean_squared_error", 
+#nn %>% compile (loss = "mean_squared_error", 
+nn %>% compile (loss = "mse", 
                 optimizer = optimizer_rmsprop(),
-                metrics = list ("mean_absolute_error"))
+                metrics = list ("mean_squared_error", "mean_absolute_error"))
 
-#early_stopping = EarlyStopping(monitor = "val_loss", min_delta = 0, patience = 0,
-#                               verbose = 0, mode = "auto")
+early_stop = callback_early_stopping(monitor = "val_loss", patience = 20)
 
 history = nn %>% fit (x, y, epochs = 200, 
-                      batch_size = 32,
-                      validation_data = list (x_test, y_test),
-                      verbose = 0.5)
+                      batch_size = 1000,
+                      validation_split = 0.2,
+                      verbose = 1, callbacks = list(early_stop))
 plot (history)
+
+score = nn %>% evaluate(
+  x_test, y_test,
+  verbose = 0
+)
+score
 ```
 
 
 ## Model Building - classification
 
 ```{r}
+x = model.matrix (Class ~.-1, data = select(train, -c(Year))) %>%
+  scale()
+
+x_test = model.matrix (Class ~.-1, data = select(test, -c(Year))) %>%
+  scale()
+
 train$Class[train$Class == "prior to 1980"] = 0
 train$Class[train$Class == "between 1980 - 2000"] = 1
 train$Class[train$Class == "after 2000"] = 2
@@ -118,37 +141,187 @@ test$Class[test$Class == "between 1980 - 2000"] = 1
 test$Class[test$Class == "after 2000"] = 2
 y_test_label = as.integer(test$Class)
 
-
 train_labels = y_train_label %>%
   to_categorical(3)
 
 test_labels = y_test_label %>%
   to_categorical(3)
+```
+
+```{r}
+ train_flags <-list (
+   dropout1 = c(0.2, 0.3, 0.4),
+   nodes1 =   c(32, 64, 128),
+   nodes2 =   c(32, 64, 128),
+   nodes3 =   c(32, 64, 128),
+   l2 = c(0.001, 0.01, 0.05),
+   optimizer =  c("rmsprop", "adam", "sgd") 
+ )
 
 
-nn_classification = keras_model_sequential() %>%
-  layer_dense (unit = 64, activation = "relu", input_shape = ncol(x)) %>%
-  layer_dropout(rate = 0.4) %>% 
-  layer_dense (unit = 128, activation = "relu") %>%
-  layer_dropout(rate = 0.4) %>% 
-  layer_dense (unit = 64, activation = "relu") %>%
-  layer_dropout(rate = 0.4) %>% 
-  layer_dense (unit = 32, activation = "relu") %>%
+runs = tuning_run("nn_classification.R",  runs_dir = "runs",
+                  flags = train_flags, 
+                  sample = 0.1)
+                  
+best_run = ls_runs(order = metric_accuracy, decreasing= T, runs_dir = 'runs')[1,]
+
+
+nn_cl = keras_model_sequential() %>%
+  layer_dense (unit = best_run$flag_nodes1, activation = "relu", 
+               input_shape = ncol(x), 
+               kernel_regularizer = regularizer_l2(l = best_run$l2)) %>%
+   
+  layer_dense (unit = best_run$flag_nodes2, activation = "relu") %>%
+  layer_dropout(rate = best_run$flag_dropout1) %>%
+  layer_dense (unit = best_run$flag_nodes3, activation = "relu") %>%
   layer_dense (units = 3, activation = "softmax")
-nn_classification
 
-nn_classification %>% compile (optimizer = optimizer_rmsprop(),
-                               loss = "categorical_crossentropy",
-                               metrics = c("accuracy"))
 
-history = nn_classification %>% fit (x, train_labels, epochs = 150, 
+nn_cl %>% compile (loss = "categorical_crossentropy", 
+                optimizer = optimizer_rmsprop(),
+                metrics = list ("accuracy"))
+
+early_stop = callback_early_stopping(monitor = "val_loss", patience = 20)
+
+history = nn_cl %>% fit (x, train_labels, epochs = 200, 
                       batch_size = 1000,
-                      validation_data = list (x_test, test_labels))
+                      validation_split = 0.2,
+                      verbose = 1, callbacks = list(early_stop))
 plot (history)
+
+score_cl = nn_cl %>% evaluate(
+  x_test, test_labels,
+  verbose = 0
+)
+score_cl
+
+```
+
+
+## Lasso regression
+
+```{r}
+set.seed(12)
+
+grid = 10^seq (-3, 7, length = 100)
+cv_out = cv.glmnet(x = x, y = y, alpha = 1, lambda = grid)
+plot (cv_out)
+```
+
+
+```{r}
+lasso_predictions = predict(cv_out$glmnet.fit, newx=x_test, s = cv_out$lambda.min)
+mse_lasso=mean((y_test-lasso_predictions)^2)
+mse_lasso
+```
+
+
+
+
+## XGBoost regression
+
+```{r}
+library(xgboost)
+
+
+xgb_train = xgb.DMatrix(data = x, label = y)
+xgb_test = xgb.DMatrix(data = x_test, label = y_test)
+
+#watchlist = list(train=xgb_train, test=xgb_test)
+params <- list(booster = "gblinear", objective = "reg:squarederror", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
+
+#fit XGBoost model and display training and testing data at each iteartion
+#model = xgb.train(data = xgb_train, max.depth = 3, watchlist=watchlist, nrounds = 100)
+
+
+model = xgb.cv(data = xgb_train, max.depth = 3, nfold = 5, nrounds = 100, showsd = T, stratified = T, early.stop.round = 20, maximize = F)
+```
+
+
+```{r}
+#pred_y = predict(model, xgb_test)
+#mean((y_test - pred_y)^2)
 
 ```
 
 
 
+
+
+## XGBoost classification
+```{r}
+nrow(x_test)
+
+nrow(test_labels)
+
+```
+
+
+```{r}
+set.seed (7)
+
+
+
+xgb_train_cl = xgb.DMatrix(data = x, label = y_train_label)
+xgb_test_cl = xgb.DMatrix(data = x_test, label = y_test_label)
+
+
+#train_id = sample (1:nrow(xgb_train_cl), size = floor (0.8*nrow(train)), replace = FALSE)
+#xgb_train_cl = xgb_train_cl[train_id, ]
+#xgb_validation_cl = xgb_train_cl[-train_id, ]
+
+
+params = list(
+  booster="gbtree",
+  eta=0.001,
+  max_depth=5,
+  gamma=3,
+  subsample=0.75,
+  colsample_bytree=1,
+  objective="multi:softprob",
+  eval_metric="mlogloss",
+  num_class=3
+)
+
+
+#xgb.fit=xgb.train(
+#  params=params,
+#  data=xgb_train_cl,
+#  nrounds=1000,
+#  nthreads=1,
+#  early_stopping_rounds=10,
+#  watchlist=list(val1=xgb_train_cl,val2=xgb_test_cl),
+#  verbose=1
+#)
+
+xgb.fit=xgb.cv(
+  params=params,
+  data=xgb_train_cl,
+  nrounds=1000,
+  nfold = 5,
+  showsd = T,
+  nthreads=1,
+  early_stopping_rounds=10,
+  #watchlist=list(train=xgb_train_cl,val=xgb_validation_cl),
+  verbose=1
+)
+
+
+
+
+```
+
+```{r}
+xgb.fit
+```
+
+```{r}
+xgb.pred = predict(xgb.fit,xgb_test_cl,reshape=T)
+xgb.pred = as.data.frame(xgb.pred)
+```
+
+```{r}
+xgb.pred
+```
 
 ## Final Result
