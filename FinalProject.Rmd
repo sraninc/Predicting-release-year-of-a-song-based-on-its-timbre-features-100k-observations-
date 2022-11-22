@@ -24,6 +24,7 @@ library(dplyr)
 library (tfruns)
 library(xgboost)
 library (glmnet)
+library(caret)
 ```
 
 Reading the data
@@ -122,7 +123,7 @@ score
 ```
 
 
-## Model Building - classification
+## Model Building - NN classification
 
 ```{r}
 x = model.matrix (Class ~.-1, data = select(train, -c(Year))) %>%
@@ -136,10 +137,12 @@ train$Class[train$Class == "between 1980 - 2000"] = 1
 train$Class[train$Class == "after 2000"] = 2
 y_train_label = as.integer(train$Class)
 
+
 test$Class[test$Class == "prior to 1980"] = 0
 test$Class[test$Class == "between 1980 - 2000"] = 1
 test$Class[test$Class == "after 2000"] = 2
 y_test_label = as.integer(test$Class)
+
 
 train_labels = y_train_label %>%
   to_categorical(3)
@@ -216,112 +219,87 @@ mse_lasso
 ```
 
 
-
-
-## XGBoost regression
-
+## XGBoost Regression
 ```{r}
-library(xgboost)
+train_control = trainControl(method = "cv", 
+                             number = 5, 
+                             search = "grid",
+                             seeds = set.seed(50))
 
-
-xgb_train = xgb.DMatrix(data = x, label = y)
-xgb_test = xgb.DMatrix(data = x_test, label = y_test)
-
-#watchlist = list(train=xgb_train, test=xgb_test)
-params <- list(booster = "gblinear", objective = "reg:squarederror", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
-
-#fit XGBoost model and display training and testing data at each iteartion
-#model = xgb.train(data = xgb_train, max.depth = 3, watchlist=watchlist, nrounds = 100)
-
-
-model = xgb.cv(data = xgb_train, max.depth = 3, nfold = 5, nrounds = 100, showsd = T, stratified = T, early.stop.round = 20, maximize = F)
-```
-
-
-```{r}
-#pred_y = predict(model, xgb_test)
-#mean((y_test - pred_y)^2)
-
-```
+train_xgb = cbind(x, y)
+gbmGrid <-  expand.grid(max_depth = c(3, 5, 7), 
+                        nrounds = (1:10)*50,
+                        eta = c (0.1, 0.3, 0.5),
+                        gamma = 0,
+                        subsample = 1,
+                        min_child_weight = 1,
+                        colsample_bytree = 0.8)
 
 
 
-
-
-## XGBoost classification
-```{r}
-nrow(x_test)
-
-nrow(test_labels)
-
-```
-
-
-```{r}
-set.seed (7)
-
-
-
-xgb_train_cl = xgb.DMatrix(data = x, label = y_train_label)
-xgb_test_cl = xgb.DMatrix(data = x_test, label = y_test_label)
-
-
-#train_id = sample (1:nrow(xgb_train_cl), size = floor (0.8*nrow(train)), replace = FALSE)
-#xgb_train_cl = xgb_train_cl[train_id, ]
-#xgb_validation_cl = xgb_train_cl[-train_id, ]
-
-
-params = list(
-  booster="gbtree",
-  eta=0.001,
-  max_depth=5,
-  gamma=3,
-  subsample=0.75,
-  colsample_bytree=1,
-  objective="multi:softprob",
-  eval_metric="mlogloss",
-  num_class=3
-)
-
-
-#xgb.fit=xgb.train(
-#  params=params,
-#  data=xgb_train_cl,
-#  nrounds=1000,
-#  nthreads=1,
-#  early_stopping_rounds=10,
-#  watchlist=list(val1=xgb_train_cl,val2=xgb_test_cl),
-#  verbose=1
-#)
-
-xgb.fit=xgb.cv(
-  params=params,
-  data=xgb_train_cl,
-  nrounds=1000,
-  nfold = 5,
-  showsd = T,
-  nthreads=1,
-  early_stopping_rounds=10,
-  #watchlist=list(train=xgb_train_cl,val=xgb_validation_cl),
-  verbose=1
-)
-
-
-
+set.seed (50)
+model = caret::train(Year ~ . , 
+                     data = train_xgb, 
+                     method = "xgbTree", 
+                     trControl = train_control, 
+                     tuneGrid = gbmGrid,
+                     verbosity = 0)
 
 ```
 
 ```{r}
-xgb.fit
+model$bestTune
 ```
+
 
 ```{r}
-xgb.pred = predict(xgb.fit,xgb_test_cl,reshape=T)
-xgb.pred = as.data.frame(xgb.pred)
+pred_xgboost_reg <- predict(model,x_test)
+pred_xgboost_reg_MSE <- (caret::RMSE(pred_xgboost_reg, y_test))^2
+pred_xgboost_reg_MSE
 ```
+
+## XGBoost Classification
 
 ```{r}
-xgb.pred
+train_control = trainControl(method = "cv", 
+                             number = 5, 
+                             search = "grid",
+                             #classProbs=TRUE,
+                             summaryFunction = multiClassSummary,
+                             seeds = set.seed(50))
+
+train_xgb_cl = select (train, -c ( Year))
+train_xgb_cl$Class = as.factor(train_xgb_cl$Class)
+#levels(train_xgb_cl$Class) <- c("first_class", "second_class", "third_class")
+
+gbmGrid <-  expand.grid(max_depth = c(3, 5, 7), 
+                        nrounds = (1:10)*50,
+                        #nrounds = 2, 
+                        eta = c (0.1, 0.3, 0.5),
+                        gamma = 0,
+                        subsample = 1,
+                        min_child_weight = 1,
+                        colsample_bytree = 0.8)
+
+
+#data = select (train, -c (Year, Class))
+xgb_model_cl = caret::train( 
+                             x  = select (train_xgb_cl, -c ("Class")),
+                             y = train_xgb_cl$Class,
+                             trControl = train_control,
+                             method = "xgbTree",
+                             tuneGrid = gbmGrid)
+
+
 ```
 
+
+
+
+```{r}
+test_xgb_cl = select (test, -c ( Year))
+test_xgb_cl$Class = as.factor(test_xgb_cl$Class)
+pred_xgboost_cl <- predict(xgb_model_cl, test_xgb_cl)
+confusionMatrix (pred_xgboost_cl, test_xgb_cl$Class)
+```
 ## Final Result
