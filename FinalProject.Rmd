@@ -63,7 +63,6 @@ y  = as.matrix (select(train, c(Year)))
 x_test = model.matrix (Year ~.-1, data = select(test, -c(Class))) %>%
   scale()
 y_test = as.matrix (select(test, c(Year)))
-
 ```
 
 
@@ -71,20 +70,34 @@ y_test = as.matrix (select(test, c(Year)))
 
 
 ```{r}
-set.seed (10)
+
 
 train_flags <-list (
-  dropout1 = c(0.2, 0.3, 0.4),
-  nodes1 =   c(32, 64, 128),
-  nodes2 =   c(32, 64, 128),
-  nodes3 =   c(32, 64, 128),
-  l2 = c(0.001, 0.01, 0.05),
-  optimizer =  c("rmsprop", "adam", "sgd") 
+dropout1 = c(0.2, 0.3, 0.4),
+dropout2 = c(0.2, 0.3, 0.4),
+nodes1 =   c(64, 128, 256),
+nodes2 =   c(32, 64, 128),
+nodes3 =   c(32, 64, 128),
+l2 = c(0.001, 0.05, 0.1),
+optimizer =  c("rmsprop", "adam", "sgd"),
+lr = c (0.01, 0.1, 0.5)
 )
 
+#  train_flags <-list (
+#    dropout1 = c(0.4),
+#    dropout2 = c(0.3),
+#    nodes1 =   c(256),
+#    nodes2 =   c(128),
+#    nodes3 =   c(64),
+#    l2 = c(0.1),
+#    optimizer =  c("rmsprop"),
+#    lr = c (0.1)
+# )
+
+set.seed (10)
 runs_reg = tuning_run("nn_regression.R",  runs_dir = "runs_reg",
                   flags = train_flags,
-                  sample = 0.01)
+                  sample = 0.05)
 ```
 
 
@@ -107,12 +120,12 @@ nn %>% compile (loss = "mse",
                 optimizer = optimizer_rmsprop(),
                 metrics = list ("mean_squared_error", "mean_absolute_error"))
 
-early_stop = callback_early_stopping(monitor = "val_loss", patience = 20)
+early_stop = callback_early_stopping(monitor = "val_loss", patience = 5)
 
 history = nn %>% fit (x, y, epochs = 200, 
                       batch_size = 1000,
                       validation_split = 0.2,
-                      verbose = 1, callbacks = list(early_stop))
+                      verbose = 0, callbacks = list(early_stop, callback_reduce_lr_on_plateau(factor = best_run$flag_lr)))
 plot (history)
 
 score = nn %>% evaluate(
@@ -120,6 +133,12 @@ score = nn %>% evaluate(
   verbose = 0
 )
 score
+
+
+# pred <- predict(nn, x_test)
+# MSE <- mean((y_test - pred)^2)
+# abs_err <- mean(abs(y_test - pred))
+# c(MSE = MSE, MAE = abs_err)
 ```
 
 
@@ -152,19 +171,31 @@ test_labels = y_test_label %>%
 ```
 
 ```{r}
+ # train_flags <-list (
+ #   dropout1 = c(0.2, 0.3, 0.4),
+ #   nodes1 =   c(32, 64, 128),
+ #   nodes2 =   c(32, 64, 128),
+ #   nodes3 =   c(32, 64, 128),
+ #   l2 = c(0.001, 0.01, 0.05),
+ #   lr = c(0.01, 0.1, 0.5),
+ #   optimizer =  c("rmsprop", "adam", "sgd") 
+ # )
+
+
  train_flags <-list (
-   dropout1 = c(0.2, 0.3, 0.4),
-   nodes1 =   c(32, 64, 128),
-   nodes2 =   c(32, 64, 128),
-   nodes3 =   c(32, 64, 128),
-   l2 = c(0.001, 0.01, 0.05),
-   optimizer =  c("rmsprop", "adam", "sgd") 
+   dropout1 = c(0.3),
+   nodes1 =   c(128),
+   nodes2 =   c(128),
+   nodes3 =   c(64),
+   l2 = c(0.01),
+   lr = c(0.1, 0.2),
+   optimizer =  c("rmsprop") 
  )
 
 
 runs = tuning_run("nn_classification.R",  runs_dir = "runs",
                   flags = train_flags, 
-                  sample = 0.1)
+                  sample = 1)
                   
 best_run = ls_runs(order = metric_accuracy, decreasing= T, runs_dir = 'runs')[1,]
 
@@ -184,12 +215,13 @@ nn_cl %>% compile (loss = "categorical_crossentropy",
                 optimizer = optimizer_rmsprop(),
                 metrics = list ("accuracy"))
 
-early_stop = callback_early_stopping(monitor = "val_loss", patience = 20)
+early_stop = callback_early_stopping(monitor = "val_loss", patience = 5)
 
 history = nn_cl %>% fit (x, train_labels, epochs = 200, 
                       batch_size = 1000,
                       validation_split = 0.2,
-                      verbose = 1, callbacks = list(early_stop))
+                      verbose = 0, 
+                      callbacks = list(early_stop, callback_reduce_lr_on_plateau(factor = best_run$flag_lr)))
 plot (history)
 
 score_cl = nn_cl %>% evaluate(
@@ -274,7 +306,6 @@ train_xgb_cl$Class = as.factor(train_xgb_cl$Class)
 
 gbmGrid <-  expand.grid(max_depth = c(3, 5, 7), 
                         nrounds = (1:10)*50,
-                        #nrounds = 2, 
                         eta = c (0.1, 0.3, 0.5),
                         gamma = 0,
                         subsample = 1,
@@ -282,7 +313,6 @@ gbmGrid <-  expand.grid(max_depth = c(3, 5, 7),
                         colsample_bytree = 0.8)
 
 
-#data = select (train, -c (Year, Class))
 xgb_model_cl = caret::train( 
                              x  = select (train_xgb_cl, -c ("Class")),
                              y = train_xgb_cl$Class,
