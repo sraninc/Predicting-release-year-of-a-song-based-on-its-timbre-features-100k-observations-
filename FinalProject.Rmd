@@ -33,25 +33,53 @@ train = read.delim(file = "data/YearPredictTrain.txt", header = TRUE, sep = ",",
 test = read.delim(file = "data/YearPredictTest.txt", header = TRUE, sep = ",", dec = ".")
 ```
 
+
+## Explanatory data analysis 
+
+Correlation between covariates
+
 ```{r fig.height = 4, fig.width = 4}
-#head(train)
-#summary (train)
-#train$Class = factor(train$Class)
-#levels(train$Class)
-#corrplot(cor(select (train, -c (Year, Class))), method = "circle", tl.pos='n')
-#pc = prcomp(select (train, -c (Year, Class)),
-#            center = TRUE,
-#            scale. = TRUE)
-#summary(pc)
-#sum(is.na(x ))
-#sum(is.na(y_test))
+corrplot(cor(select (train, -c (Year, Class))), method = "circle", tl.pos='n')
+```
+
+Correlation between covariates and response variable `Year`
+
+```{r}
+as.data.frame(cor(select(train, -c (Class))))$Year
 ```
 
 
+Levels of response variable `Class`
+```{r}
+#train$Class = factor(train$Class)
+levels(factor(train$Class))
+```
+
+
+Distribution for response variable - `Class`
+```{r}
+#dplyr::count(train, Class)
+barplot(table (train$Class),  main="Class Distribution", 
+   xlab="Number of observations per each class")
+```
+
+Check for NA values
+```{r}
+sum(is.na(train))
+```
+
+PCA analysis
+
+```{r}
+pc = prcomp(select (train, -c (Year, Class)),
+            center = TRUE,
+            scale. = TRUE)
+summary(pc)
+```
 
 ## Data Pre-processing
 
-Scaling train, test and validation datasets.
+Scaling train and test datasets.
 
 ```{r}
 set.seed(4)
@@ -72,32 +100,36 @@ y_test = as.matrix (select(test, c(Year)))
 ```{r}
 
 
-train_flags <-list (
+train_flags = list (
 dropout1 = c(0.2, 0.3, 0.4),
 dropout2 = c(0.2, 0.3, 0.4),
 nodes1 =   c(64, 128, 256),
-nodes2 =   c(32, 64, 128),
+nodes2 =   c(64, 128),
 nodes3 =   c(32, 64, 128),
 l2 = c(0.001, 0.05, 0.1),
 optimizer =  c("rmsprop", "adam", "sgd"),
-lr = c (0.01, 0.1, 0.5)
+lr = c (0.01, 0.1, 0.5),
+batch_size = c (100, 500),
+epochs = c (100, 200)
 )
 
-#  train_flags <-list (
+#  train_flags =list (
 #    dropout1 = c(0.4),
 #    dropout2 = c(0.3),
 #    nodes1 =   c(256),
 #    nodes2 =   c(128),
 #    nodes3 =   c(64),
-#    l2 = c(0.1),
+#    l2 = c(0.01),
 #    optimizer =  c("rmsprop"),
-#    lr = c (0.1)
+#    lr = c(0.1), 
+#    batch_size = c (500),
+#    epochs = c (100)
 # )
 
 set.seed (10)
 runs_reg = tuning_run("nn_regression.R",  runs_dir = "runs_reg",
                   flags = train_flags,
-                  sample = 0.05)
+                  sample = 0.01)
 ```
 
 
@@ -114,16 +146,14 @@ nn = keras_model_sequential() %>%
   layer_dense (unit = best_run$flag_nodes3, activation = "relu") %>%
   layer_dense (units = 1)
 
-
-#nn %>% compile (loss = "mean_squared_error", 
-nn %>% compile (loss = "mse", 
+nn %>% compile (loss = "mean_squared_error", 
                 optimizer = optimizer_rmsprop(),
                 metrics = list ("mean_squared_error", "mean_absolute_error"))
 
 early_stop = callback_early_stopping(monitor = "val_loss", patience = 5)
 
-history = nn %>% fit (x, y, epochs = 200, 
-                      batch_size = 1000,
+history = nn %>% fit (x, y, epochs = best_run$flag_epochs, 
+                      batch_size = best_run$flag_batch_size,
                       validation_split = 0.2,
                       verbose = 0, callbacks = list(early_stop, callback_reduce_lr_on_plateau(factor = best_run$flag_lr)))
 plot (history)
@@ -134,11 +164,6 @@ score = nn %>% evaluate(
 )
 score
 
-
-# pred <- predict(nn, x_test)
-# MSE <- mean((y_test - pred)^2)
-# abs_err <- mean(abs(y_test - pred))
-# c(MSE = MSE, MAE = abs_err)
 ```
 
 
@@ -147,7 +172,6 @@ score
 ```{r}
 x = model.matrix (Class ~.-1, data = select(train, -c(Year))) %>%
   scale()
-
 x_test = model.matrix (Class ~.-1, data = select(test, -c(Year))) %>%
   scale()
 
@@ -156,46 +180,48 @@ train$Class[train$Class == "between 1980 - 2000"] = 1
 train$Class[train$Class == "after 2000"] = 2
 y_train_label = as.integer(train$Class)
 
-
 test$Class[test$Class == "prior to 1980"] = 0
 test$Class[test$Class == "between 1980 - 2000"] = 1
 test$Class[test$Class == "after 2000"] = 2
 y_test_label = as.integer(test$Class)
 
-
 train_labels = y_train_label %>%
   to_categorical(3)
-
 test_labels = y_test_label %>%
   to_categorical(3)
 ```
 
+
 ```{r}
- # train_flags <-list (
- #   dropout1 = c(0.2, 0.3, 0.4),
- #   nodes1 =   c(32, 64, 128),
- #   nodes2 =   c(32, 64, 128),
- #   nodes3 =   c(32, 64, 128),
- #   l2 = c(0.001, 0.01, 0.05),
- #   lr = c(0.01, 0.1, 0.5),
- #   optimizer =  c("rmsprop", "adam", "sgd") 
- # )
-
-
  train_flags <-list (
-   dropout1 = c(0.3),
-   nodes1 =   c(128),
-   nodes2 =   c(128),
-   nodes3 =   c(64),
-   l2 = c(0.01),
-   lr = c(0.1, 0.2),
-   optimizer =  c("rmsprop") 
+    dropout1 = c(0.2, 0.3, 0.4),
+    nodes1 =   c(32, 64, 128),
+    nodes2 =   c(32, 64, 128),
+    nodes3 =   c(32, 64, 128),
+    l2 = c(0.001, 0.01, 0.05),
+    lr = c(0.01, 0.1, 0.5),
+    optimizer =  c("rmsprop", "adam", "sgd"),
+    batch_size = c (100, 200),
+    epochs = c (100, 200)
  )
+
+
+ # train_flags <-list (
+ #   dropout1 = c(0.3),
+ #   nodes1 =   c(128),
+ #   nodes2 =   c(128),
+ #   nodes3 =   c(64),
+ #   l2 = c(0.01),
+ #   lr = c(0.1, 0.2),
+ #   optimizer =  c("rmsprop"),
+ #   batch_size = c (1000),
+ #   epochs = c (200)
+ # )
 
 
 runs = tuning_run("nn_classification.R",  runs_dir = "runs",
                   flags = train_flags, 
-                  sample = 1)
+                  sample = 0.01)
                   
 best_run = ls_runs(order = metric_accuracy, decreasing= T, runs_dir = 'runs')[1,]
 
@@ -217,8 +243,8 @@ nn_cl %>% compile (loss = "categorical_crossentropy",
 
 early_stop = callback_early_stopping(monitor = "val_loss", patience = 5)
 
-history = nn_cl %>% fit (x, train_labels, epochs = 200, 
-                      batch_size = 1000,
+history = nn_cl %>% fit (x, train_labels, epochs =  best_run$flag_epochs, 
+                      batch_size = best_run$flag_batch_size,
                       validation_split = 0.2,
                       verbose = 0, 
                       callbacks = list(early_stop, callback_reduce_lr_on_plateau(factor = best_run$flag_lr)))
@@ -259,12 +285,16 @@ train_control = trainControl(method = "cv",
                              seeds = set.seed(50))
 
 train_xgb = cbind(x, y)
-gbmGrid <-  expand.grid(max_depth = c(3, 5, 7), 
-                        nrounds = (1:10)*50,
-                        eta = c (0.1, 0.3, 0.5),
-                        gamma = 0,
-                        subsample = 1,
-                        min_child_weight = 1,
+gbmGrid <-  expand.grid(#max_depth = c(5, 7, 9), 
+                        max_depth = c( 9),
+                        #nrounds = (1:10)*50,
+                        nrounds = c(100),  #, 200, 300),
+                        eta = c (0.1),# 0.3, 0.5),
+                        #gamma = c(0, 0.01, 0.1, 0.2),
+                        gamma = c(0.1), #, 0.1),
+                        subsample = c (0.8), # 0.8, 1),
+                        min_child_weight = c (3), 
+                        #min_child_weight = c(1, 3, 5),
                         colsample_bytree = 0.8)
 
 

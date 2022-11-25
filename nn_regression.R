@@ -10,7 +10,9 @@ FLAGS <- flags(
   flag_integer('nodes3', 128),
   flag_numeric('l2', 0.001),
   flag_string ('optimizer', 'rmsprop'),
-  flag_numeric('lr', 0.1)
+  flag_numeric('lr', 0.1),
+  flag_numeric ('batch_size', 100),
+  flag_numeric ('epochs', 200)
 )
 
 early_stop = callback_early_stopping(monitor = "val_loss", patience = 5)
@@ -35,8 +37,8 @@ model %>%
            loss = "mean_squared_error",
            metrics = c("mean_squared_error") )  %>%
   fit (x, y, 
-       epochs = 200, 
-       batch_size = 1000,
+       epochs = FLAGS$epochs, 
+       batch_size = FLAGS$batch_size,
        validation_split = 0.2,
        verbose = 0,
        callbacks = list(early_stop, 

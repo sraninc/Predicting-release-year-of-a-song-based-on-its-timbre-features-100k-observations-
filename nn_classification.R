@@ -7,7 +7,9 @@ train_flags <- flags(
   flag_integer('nodes3', 128),
   flag_numeric('l2', 0.001),
   flag_string ('optimizer', 'rmsprop'),
-  flag_numeric('lr', 0.1)
+  flag_numeric('lr', 0.1),
+  flag_numeric ('batch_size', 100),
+  flag_numeric ('epochs', 200)
 )
 
 early_stop = callback_early_stopping(monitor = "val_loss", patience = 5)
@@ -28,8 +30,8 @@ model <- keras_model_sequential() %>%
                    loss = "categorical_crossentropy",
                    metrics = c("accuracy") ) %>%
   fit (x, train_labels, 
-       epochs = 200, 
-       batch_size = 1000,
+       epochs = train_flags$epochs, 
+       batch_size = train_flags$batch_size,
        validation_split = 0.2,
        verbose = 0,
        callbacks = list(early_stop, callback_reduce_lr_on_plateau(factor = train_flags$lr)))
