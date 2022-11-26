@@ -20,9 +20,9 @@ early_stop = callback_early_stopping(monitor = "val_loss", patience = 5)
 model = keras_model_sequential()
 model %>% 
   layer_dense(units = FLAGS$nodes1, 
-              input_shape = ncol(x),
-              activation = 'relu',
-              kernel_regularizer = regularizer_l2(l = FLAGS$l2)) %>%
+               input_shape = ncol(x),
+               activation = 'relu',
+               kernel_regularizer = regularizer_l2(l = FLAGS$l2)) %>%
   layer_dropout(FLAGS$dropout1) %>%
   layer_dense(units = FLAGS$nodes2,
               activation = 'relu') %>%

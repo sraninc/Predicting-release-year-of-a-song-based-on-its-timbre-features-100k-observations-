@@ -62,6 +62,10 @@ Distribution for response variable - `Class`
 barplot(table (train$Class),  main="Class Distribution", 
    xlab="Number of observations per each class")
 ```
+```{r}
+hist(train$Year, main = "Year distribution", xlab = "Year")
+```
+
 
 Check for NA values
 ```{r}
@@ -100,31 +104,31 @@ y_test = as.matrix (select(test, c(Year)))
 ```{r}
 
 
-train_flags = list (
-dropout1 = c(0.2, 0.3, 0.4),
-dropout2 = c(0.2, 0.3, 0.4),
-nodes1 =   c(64, 128, 256),
-nodes2 =   c(64, 128),
-nodes3 =   c(32, 64, 128),
-l2 = c(0.001, 0.05, 0.1),
-optimizer =  c("rmsprop", "adam", "sgd"),
-lr = c (0.01, 0.1, 0.5),
-batch_size = c (100, 500),
-epochs = c (100, 200)
-)
-
-#  train_flags =list (
-#    dropout1 = c(0.4),
-#    dropout2 = c(0.3),
-#    nodes1 =   c(256),
-#    nodes2 =   c(128),
-#    nodes3 =   c(64),
-#    l2 = c(0.01),
-#    optimizer =  c("rmsprop"),
-#    lr = c(0.1), 
-#    batch_size = c (500),
-#    epochs = c (100)
+# train_flags = list (
+# dropout1 = c(0.2, 0.3, 0.4),
+# dropout2 = c(0.2, 0.3, 0.4),
+# nodes1 =   c(64, 128, 256),
+# nodes2 =   c(64, 128),
+# nodes3 =   c(32, 64, 128),
+# l2 = c(0.001, 0.05, 0.1),
+# optimizer =  c("rmsprop", "adam", "sgd"),
+# lr = c (0.01, 0.1, 0.5),
+# batch_size = c (100, 500),
+# epochs = c (100, 200)
 # )
+
+ train_flags =list (
+   dropout1 = c(0.3, 0.4),
+   dropout2 = c(0.3, 0.4),
+   nodes1 =   c(256, 128),
+   nodes2 =   c(128, 64),
+   nodes3 =   c(64, 32),
+   l2 = c(0.01, 0.05),
+   optimizer =  c("rmsprop","adam", "sgd"),
+   lr = c(0.1, 0.05),
+   batch_size = c (100, 150),
+   epochs = c (200)
+)
 
 set.seed (10)
 runs_reg = tuning_run("nn_regression.R",  runs_dir = "runs_reg",
@@ -137,13 +141,12 @@ runs_reg = tuning_run("nn_regression.R",  runs_dir = "runs_reg",
 
 best_run = ls_runs(order = metric_mean_squared_error, decreasing= F, runs_dir = 'runs_reg')[1,]
 nn = keras_model_sequential() %>%
-  layer_dense (unit = best_run$flag_nodes1, activation = "relu", 
-               input_shape = ncol(x), 
-               kernel_regularizer = regularizer_l2(l = best_run$l2)) %>%
-   
-  layer_dense (unit = best_run$flag_nodes2, activation = "relu") %>%
+  layer_dense (units = best_run$flag_nodes1, activation = "relu", 
+                input_shape = ncol(x), 
+                kernel_regularizer = regularizer_l2(l = best_run$l2)) %>%
+  layer_dense (units = best_run$flag_nodes2, activation = "relu") %>%
   layer_dropout(rate = best_run$flag_dropout1) %>%
-  layer_dense (unit = best_run$flag_nodes3, activation = "relu") %>%
+  layer_dense (units = best_run$flag_nodes3, activation = "relu") %>%
   layer_dense (units = 1)
 
 nn %>% compile (loss = "mean_squared_error", 
@@ -193,30 +196,32 @@ test_labels = y_test_label %>%
 
 
 ```{r}
- train_flags <-list (
-    dropout1 = c(0.2, 0.3, 0.4),
-    nodes1 =   c(32, 64, 128),
-    nodes2 =   c(32, 64, 128),
-    nodes3 =   c(32, 64, 128),
-    l2 = c(0.001, 0.01, 0.05),
-    lr = c(0.01, 0.1, 0.5),
-    optimizer =  c("rmsprop", "adam", "sgd"),
-    batch_size = c (100, 200),
-    epochs = c (100, 200)
- )
-
-
  # train_flags <-list (
- #   dropout1 = c(0.3),
- #   nodes1 =   c(128),
- #   nodes2 =   c(128),
- #   nodes3 =   c(64),
- #   l2 = c(0.01),
- #   lr = c(0.1, 0.2),
- #   optimizer =  c("rmsprop"),
- #   batch_size = c (1000),
- #   epochs = c (200)
+ #    dropout1 = c(0.2, 0.3, 0.4),
+ #    nodes1 =   c(32, 64, 128),
+ #    nodes2 =   c(32, 64, 128),
+ #    nodes3 =   c(32, 64, 128),
+ #    l2 = c(0.001, 0.01, 0.05),
+ #    lr = c(0.01, 0.1, 0.5),
+ #    optimizer =  c("rmsprop", "adam", "sgd"),
+ #    batch_size = c (100, 200),
+ #    epochs = c (100, 200)
  # )
+
+
+ train_flags <-list (
+   dropout1 = c(0.3, 0.4),
+   dropout2 = c(0.3,0.4),
+   dropout3 = c(0.3, 0.4),
+   nodes1 =   c(256, 128, 64),
+   nodes2 =   c(128, 64, 32),
+   nodes3 =   c(64, 32),
+   l2 = c(0.01, 0.05),
+   lr = c(0.1, 0.05),
+   optimizer =  c("rmsprop", "adam", "sgd"),
+   batch_size = c (50, 100, 150),
+   epochs = c (200)
+ )
 
 
 runs = tuning_run("nn_classification.R",  runs_dir = "runs",
@@ -227,13 +232,13 @@ best_run = ls_runs(order = metric_accuracy, decreasing= T, runs_dir = 'runs')[1,
 
 
 nn_cl = keras_model_sequential() %>%
-  layer_dense (unit = best_run$flag_nodes1, activation = "relu", 
+  layer_dense (units = best_run$flag_nodes1, activation = "relu", 
                input_shape = ncol(x), 
                kernel_regularizer = regularizer_l2(l = best_run$l2)) %>%
-   
-  layer_dense (unit = best_run$flag_nodes2, activation = "relu") %>%
-  layer_dropout(rate = best_run$flag_dropout1) %>%
-  layer_dense (unit = best_run$flag_nodes3, activation = "relu") %>%
+  layer_dropout(rate = best_run$flag_dropout1) %>% 
+  layer_dense (units = best_run$flag_nodes2, activation = "relu") %>%
+  layer_dropout(rate = best_run$flag_dropout2) %>%
+  layer_dense (units = best_run$flag_nodes3, activation = "relu") %>%
   layer_dense (units = 3, activation = "softmax")
 
 
@@ -257,6 +262,7 @@ score_cl = nn_cl %>% evaluate(
 score_cl
 
 ```
+
 
 
 ## Lasso regression
@@ -334,11 +340,19 @@ train_xgb_cl = select (train, -c ( Year))
 train_xgb_cl$Class = as.factor(train_xgb_cl$Class)
 #levels(train_xgb_cl$Class) <- c("first_class", "second_class", "third_class")
 
+# gbmGrid <-  expand.grid(max_depth = c(3, 5, 7), 
+#                         nrounds = (1:10)*50,
+#                         eta = c (0.1, 0.3, 0.5),
+#                         gamma = 0,
+#                         subsample = 1,
+#                         min_child_weight = 1,
+#                         colsample_bytree = 0.8)
+
 gbmGrid <-  expand.grid(max_depth = c(3, 5, 7), 
-                        nrounds = (1:10)*50,
-                        eta = c (0.1, 0.3, 0.5),
-                        gamma = 0,
-                        subsample = 1,
+                        nrounds = c(100),
+                        eta = c (0.1),
+                        gamma = c(0.1),
+                        subsample = c (0.8),
                         min_child_weight = 1,
                         colsample_bytree = 0.8)
 
