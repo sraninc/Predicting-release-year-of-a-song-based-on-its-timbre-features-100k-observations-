@@ -199,7 +199,7 @@ randf_test_MSE
 library(e1071)
 set.seed(1)
 
-#tuning cost 
+#tuning cost and gamma
 tune.out <- tune(svm , Train$Year~timbreAvg1+timbreAvg2+timbreAvg3+timbreAvg5+timbreAvg6+timbreAvg8+timbreAvg9+timbreAvg10+timbreAvg11+timbreAvg12+timbreCov1+timbreCov2+timbreCov3+timbreCov4+timbreCov5+timbreCov6+timbreCov7+timbreCov8+timbreCov9+timbreCov10+timbreCov11+timbreCov12+timbreCov13+timbreCov15+timbreCov16+timbreCov17+timbreCov18+timbreCov20+timbreCov21+timbreCov22+timbreCov23+timbreCov24+timbreCov25+timbreCov26+timbreCov27+timbreCov28+timbreCov29+timbreCov31+timbreCov32+timbreCov33+timbreCov34+timbreCov35+timbreCov36+timbreCov38+timbreCov40+timbreCov41+timbreCov44+timbreCov45+timbreCov46+timbreCov47+timbreCov48+timbreCov49+timbreCov50+timbreCov51+timbreCov52+timbreCov53+timbreCov57+timbreCov58+timbreCov59+timbreCov60+timbreCov61+timbreCov62+timbreCov63+timbreCov64+timbreCov66+timbreCov69+timbreCov70+timbreCov71+timbreCov73+timbreCov75+timbreCov76+timbreCov77,
                  data = Train,
                  kernel = "radial",
