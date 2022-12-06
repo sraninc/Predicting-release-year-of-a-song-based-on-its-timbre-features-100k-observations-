@@ -208,8 +208,8 @@ table_rf
 1-table_rf[,4] #Sensitivity
 
 c(sum(table_rf[2:3,2:3])/sum(table_rf[2:3,1:3]),
-  sum(table_rf[2:3,c(1,3)])/sum(table_rf[2:3,1:3]),
-  sum(table_rf[2:3,1:2])/sum(table_rf[2:3,1:3])) #Specificity
+  sum(table_rf[c(1,3),c(1,3)])/sum(table_rf[c(1,3),1:3]),
+  sum(table_rf[1:2,1:2])/sum(table_rf[1:2,1:3])) #Specificity
 
 1-table_rf[4,4] #Accuracy
 
@@ -220,8 +220,8 @@ table_gbm
 1-table_gbm[,4] #Sensitivity
 
 c(sum(table_gbm[2:3,2:3])/sum(table_gbm[2:3,1:3]),
-  sum(table_gbm[2:3,c(1,3)])/sum(table_gbm[2:3,1:3]),
-  sum(table_gbm[2:3,1:2])/sum(table_gbm[2:3,1:3])) #Specificity
+  sum(table_gbm[c(1,3),c(1,3)])/sum(table_gbm[c(1,3),1:3]),
+  sum(table_gbm[1:2,1:2])/sum(table_gbm[1:2,1:3])) #Specificity
 
 1-table_gbm[4,4] #Accuracy
 #Accuracy0.6746
@@ -231,8 +231,8 @@ table_ensemble
 1-table_ensemble[,4] #Sensitivity
 
 c(sum(table_ensemble[2:3,2:3])/sum(table_ensemble[2:3,1:3]),
-  sum(table_ensemble[2:3,c(1,3)])/sum(table_ensemble[2:3,1:3]),
-  sum(table_ensemble[2:3,1:2])/sum(table_ensemble[2:3,1:3])) #Specificity
+  sum(table_ensemble[c(1,3),c(1,3)])/sum(table_ensemble[c(1,3),1:3]),
+  sum(table_ensemble[1:2,1:2])/sum(table_ensemble[1:2,1:3])) #Specificity
 
 1-table_ensemble[4,4]
 #Accuracy0.6752
@@ -293,8 +293,8 @@ table_rf_down
 1-table_rf_down[4,4] #Accuracy
 1-table_rf_down[,4] #Sensitivity
 c(sum(table_rf_down[2:3,2:3])/sum(table_rf_down[2:3,1:3]),
-  sum(table_rf_down[2:3,c(1,3)])/sum(table_rf_down[2:3,1:3]),
-  sum(table_rf_down[2:3,1:2])/sum(table_rf_down[2:3,1:3])) #Specificity
+  sum(table_rf_down[c(1,3),c(1,3)])/sum(table_rf_down[c(1,3),1:3]),
+  sum(table_rf_down[1:2,1:2])/sum(table_rf_down[1:2,1:3])) #Specificity
 #Accuracy0.5959471
 
 table_gbm_down <- h2o.confusionMatrix(hit_gbm_down,newdata=test_h2o_down)
@@ -302,8 +302,8 @@ table_gbm_down
 1-table_gbm_down[4,4]#Accuracy
 1-table_gbm_down[,4]#Sensitivity
 c(sum(table_gbm_down[2:3,2:3])/sum(table_gbm_down[2:3,1:3]),
-  sum(table_gbm_down[2:3,c(1,3)])/sum(table_gbm_down[2:3,1:3]),
-  sum(table_gbm_down[2:3,1:2])/sum(table_gbm_down[2:3,1:3])) #Specificity
+  sum(table_gbm_down[c(1,3),c(1,3)])/sum(table_gbm_down[c(1,3),1:3]),
+  sum(table_gbm_down[1:2,1:2])/sum(table_gbm_down[1:2,1:3])) #Specificity
 #Accuracy0.6162117
 
 
@@ -314,8 +314,8 @@ table_ensemble_down
 1-table_ensemble_down[,4]#sensitivity
 
 c(sum(table_ensemble_down[2:3,2:3])/sum(table_ensemble_down[2:3,1:3]),
-  sum(table_ensemble_down[2:3,c(1,3)])/sum(table_ensemble_down[2:3,1:3]),
-  sum(table_ensemble_down[2:3,1:2])/sum(table_ensemble_down[2:3,1:3])) #Specificity
+  sum(table_ensemble_down[c(1,3),c(1,3)])/sum(table_ensemble_down[c(1,3),1:3]),
+  sum(table_ensemble_down[1:2,1:2])/sum(table_ensemble_down[1:2,1:3])) #Specificity
 
 1-table_ensemble_down[4,4]
 #Accuracy0.6236559
